@@ -1,0 +1,16 @@
+{
+  "name": "fanfiction-project",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "tasha-03",
+  "license": "ISC",
+  "dependencies": {
+    "dotenv": "^16.0.0",
+    "knex": "^1.0.3",
+    "pg": "^8.7.3"
+  }
+}
