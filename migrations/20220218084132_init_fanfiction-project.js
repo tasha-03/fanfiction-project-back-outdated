@@ -418,26 +418,26 @@ exports.up = async (knex) => {
  * @returns { Promise<void> }
  */
 exports.down = async (knex) => {
-  await knex.schema.dropTableIfExists("users");
-  await knex.schema.dropTableIfExists("works");
-  await knex.schema.dropTableIfExists("news");
-  await knex.schema.dropTableIfExists("parts");
-  await knex.schema.dropTableIfExists("comments");
-  await knex.schema.dropTableIfExists("tags");
-  await knex.schema.dropTableIfExists("fandoms");
-  await knex.schema.dropTableIfExists("warnings");
-  await knex.schema.dropTableIfExists("series");
-  await knex.schema.dropTableIfExists("collections");
-  await knex.schema.dropTableIfExists("history");
-  await knex.schema.dropTableIfExists("favourite_authors");
-  await knex.schema.dropTableIfExists("favourite_works");
-  await knex.schema.dropTableIfExists("favourite_series");
-  await knex.schema.dropTableIfExists("favourite_collections");
-  await knex.schema.dropTableIfExists("tag_to_work");
-  await knex.schema.dropTableIfExists("tag_to_series");
-  await knex.schema.dropTableIfExists("tag_to_collection");
-  await knex.schema.dropTableIfExists("fandom_to_work");
-  await knex.schema.dropTableIfExists("warning_to_work");
-  await knex.schema.dropTableIfExists("work_to_series");
   await knex.schema.dropTableIfExists("work_to_collection");
+  await knex.schema.dropTableIfExists("work_to_series");
+  await knex.schema.dropTableIfExists("warning_to_work");
+  await knex.schema.dropTableIfExists("fandom_to_work");
+  await knex.schema.dropTableIfExists("tag_to_collection");
+  await knex.schema.dropTableIfExists("tag_to_series");
+  await knex.schema.dropTableIfExists("tag_to_work");
+  await knex.schema.dropTableIfExists("favourite_collections");
+  await knex.schema.dropTableIfExists("favourite_series");
+  await knex.schema.dropTableIfExists("favourite_works");
+  await knex.schema.dropTableIfExists("favourite_authors");
+  await knex.schema.dropTableIfExists("history");
+  await knex.schema.dropTableIfExists("collections");
+  await knex.schema.dropTableIfExists("series");
+  await knex.schema.dropTableIfExists("warnings");
+  await knex.schema.dropTableIfExists("fandoms");
+  await knex.schema.dropTableIfExists("tags");
+  await knex.schema.dropTableIfExists("comments");
+  await knex.schema.dropTableIfExists("parts");
+  await knex.schema.dropTableIfExists("news");
+  await knex.schema.dropTableIfExists("works");
+  await knex.schema.dropTableIfExists("users");
 };
