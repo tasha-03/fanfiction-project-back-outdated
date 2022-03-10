@@ -1,67 +1,68 @@
 const ControllerException = require("../utils/ControllerException");
 const knex = require("../utils/db");
 
-/*
-To install:
-bcrypt     - hashing passwords
-(register, login, restorePassword, editProfile)
-
-nodemailer - sending emails
-(requestEmailConfirmation, restorePassword)
-
-uuid (?)   - generating confirmation codes
-(requestEmailConfirmation, restorePassword)
-
-TO DO:
-ControllerExceptions
-Generating confirmation codes
-Sending emails
-Passwords hashing (?encrypting)
-*/
-
 // register (any)
 exports.register = async ({ login, email, password }) => {
-  try {
-    const [{ id: userId }] = await knex("users")
-      .insert({ login, email, password })
-      .returning("id");
-
-    return { userId };
-  } catch (error) {
-    throw new ControllerException("EMAIL_IN_USE", "Email in use");//split the errors
+  const [recordWithLogin] = await knex("users")
+    .select("id")
+    .where({ login: login });
+  if (recordWithLogin) {
+    throw new ControllerException("LOGIN_IN_USE", "Login is already in use");
   }
+  const [recordWithEmail] = await knex("users")
+    .select("id")
+    .where({ email: email });
+  if (recordWithEmail) {
+    throw new ControllerException("EMAIL_IN_USE", "Email in use");
+  }
+  const [{ id: userId }] = await knex("users")
+    .insert([{ login, email, password }]) // password hashing
+    .returning("id");
+  return { userId };
 };
 
 // request email confirmation (user)
 exports.requestEmailConfirmation = async ({ userId }) => {
-  try {
-    const confirmationCode = "000000"; //generate somehow (uuid?)
-
-    const email = await knex("users")
-      .where("id", userId)
-      .update({
-        email_confirmation_code: confirmationCode,
-        updated_at: knex.fn.now(),
-      })
-      .returning("email");
-
-    // send email (nodemailer)
-    return {};
-  } catch (error) {
-    throw new ControllerException("", "");
+  //generate somehow (uuid?)
+  const confirmationCode = "000000";
+  const [record] = await knex("users")
+    .select("email_is_confirmed as emailIsConfirmed")
+    .where({ id: userId });
+  if (!record) {
+    throw new ControllerException(
+      "INTERNAL_SERVER_ERROR",
+      "Internal server error"
+    );
   }
+  if (record.emailIsConfirmed) {
+    throw new ControllerException(
+      "ALREADY_CONFIRMED",
+      "Email has been already confirmed"
+    );
+  }
+  const [{ email: email }] = await knex("users")
+    .where({ id: userId })
+    .update({
+      email_confirmation_code: confirmationCode,
+      updated_at: knex.fn.now(),
+    })
+    .returning("email");
+  // send email (nodemailer)
+  return {};
 };
 
 // confirm email (user)
-exports.confirmEmail = ({ userId, confirmationCode }) => {
+exports.confirmEmail = async ({ userId, confirmationCode }) => {
   try {
-    const emailConfirmationCode = await knex("users")
-      .where("id", userId)
+    const [{ email_confirmation_code: emailConfirmationCode }] = await knex(
+      "users"
+    )
+      .where({ id: userId })
       .returning("email_confirmation_code");
 
     //compare confirmation codes
     if (emailConfirmationCode === confirmationCode) {
-      await knex("users").where("id", userId).update({
+      await knex("users").where({ id: userId }).update({
         email_is_confirmed: true,
         updated_at: knex.fn.now(),
       });
@@ -80,24 +81,18 @@ exports.confirmEmail = ({ userId, confirmationCode }) => {
 
 // login (any)
 exports.login = async ({ login, password }) => {
-  try {
-    const getPassword = await knex("users")
-      .where("login", login)
-      .return("password");
-    if (password === getPassword) {
-      return { userId };
-    } else {
-      throw new ControllerException("INVALID_PASSWORD", "Invalid password");
-    }
-  } catch (error) {
-    throw new ControllerException("", "");
+  const [record] = await knex("users").select("id").where({ login, password });
+  if (!record) {
+    throw new ControllerException("WRONG_CREDENTIALS", "Wrong credentials");
+  } else {
+    return { userId: record.id };
   }
 };
 
 // edit profile (user)
 exports.editProfile = async ({ userId, login, email, password }) => {
   try {
-    await knex("users").where("id", userId).update({
+    await knex("users").where({ id: userId }).update({
       login: login,
       email: email,
       password: password,
@@ -112,7 +107,7 @@ exports.editProfile = async ({ userId, login, email, password }) => {
 // change role (admin)
 exports.changeRole = async ({ userId, role }) => {
   try {
-    await knex("users").where("id", userId).update({
+    await knex("users").where({ id: userId }).update({
       role: role,
       updated_at: knex.fn.now(),
     });
@@ -125,7 +120,7 @@ exports.changeRole = async ({ userId, role }) => {
 // deactivate profile (user)
 exports.deactivateProfile = async ({ userId }) => {
   try {
-    await knex("users").where("id", userId).update({
+    await knex("users").where({ id: userId }).update({
       active: false,
       updated_at: knex.fn.now(),
     });
@@ -138,7 +133,7 @@ exports.deactivateProfile = async ({ userId }) => {
 // activate profile (user)
 exports.activateProfile = async ({ userId }) => {
   try {
-    await knex("users").where("id", userId).update({
+    await knex("users").where({ id: userId }).update({
       active: true,
       updated_at: knex.fn.now(),
     });
@@ -155,7 +150,7 @@ exports.changePreferences = async ({
   email_notitfications_on,
 }) => {
   try {
-    await knex("users").where("id", userId).update({
+    await knex("users").where({ id: userId }).update({
       dark_theme: dark_theme,
       email_notitfications_on: email_notitfications_on,
       updated_at: knex.fn.now(),
@@ -167,20 +162,17 @@ exports.changePreferences = async ({
 };
 
 // restore password
-exports.restorePassword = async ({ login }) => {
+exports.restorePassword = async ({ login }) => { // добавить restorePasswordCode + время на подтверждение, как с подтверждением почты
   try {
     const confirmationCode = "000000"; //generate somehow (uuid?)
-
-    const email = await knex("users")
-      .where("login", login)
+    const [{ email: email }] = await knex("users")
+      .where({ login: login })
       .update({
         email_confirmation_code: confirmationCode,
         updated_at: knex.fn.now(),
       })
       .returning("email");
-
     //send email
-
     if (emailConfirmationCode === confirmationCode) {
       return {};
     } else {
@@ -192,4 +184,25 @@ exports.restorePassword = async ({ login }) => {
   } catch (error) {
     throw new ControllerException("", "");
   }
+};
+
+exports.getAllUsers = async ({ limit = 20, page = 1 }) => {
+  const records = await knex("users")
+    .select("id", "login")
+    .limit(limit)
+    .offset(limit * (page - 1));
+  return records;
+};
+
+exports.getUserById = async ({ userId }) => {
+  const [record] = await knex("users")
+    .select("id", "login", "role")
+    .where({ id: userId });
+  if (!record) {
+    throw new ControllerException(
+      "INTERNAL_SERVER_ERROR",
+      "Internal server error"
+    );
+  }
+  return record;
 };
