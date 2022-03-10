@@ -7,7 +7,7 @@ exports.createTag = async ({ name }) => {
       name,
     },
   ]);
-  return {}
+  return {};
 };
 
 exports.updateTag = async ({ tagId, name }) => {
@@ -15,21 +15,37 @@ exports.updateTag = async ({ tagId, name }) => {
   if (!record) {
     throw new ControllerException("TAG_NOT_FOUND", "Tag has not been found");
   }
-  await knex("tags").where({ id: tagId }).update({ name });
-  return {}
+  await knex("tags")
+    .where({ id: tagId })
+    .update({ name, updated_at: knex.fn.now() });
+  return {};
 };
 
 exports.deleteTag = async ({ tagId }) => {
-    const [record] = await knex("tags").select("id").where({ id: tagId });
+  const [record] = await knex("tags").select("id").where({ id: tagId });
   if (!record) {
     throw new ControllerException("TAG_NOT_FOUND", "Tag has not been found");
   }
   await knex("tags").where({ id: tagId }).del();
-  return {}
+  return {};
 };
 
-exports.getTagById = async ({ tagId }) => {};
+exports.getTagById = async ({ tagId }) => {
+  const [record] = await knex("tags").select().where({ id: tagId });
+  if (!record) {
+    throw new ControllerException("TAG_NOT_FOUND", "Tag has not been found");
+  } else {
+    return record;
+  }
+};
 
-exports.getTagByName = async ({ name }) => {};
-
-exports.getAllTags = async () => {};
+exports.getTagByName = async ({ name }) => {
+  const records = await knex("tags")
+    .select()
+    .where("name", "ilike", `%${name}%`);
+  if (!records) {
+    throw new ControllerException("TAG_NOT_FOUND", "Tag has not been found");
+  } else {
+    return records;
+  }
+};

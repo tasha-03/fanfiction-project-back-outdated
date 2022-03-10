@@ -6,7 +6,7 @@ exports.createNews = async ({ authorId, text }) => {
   return {};
 };
 
-exports.updateNews = async ({ newsId, authorId, text }) => {
+exports.updateNews = async ({ newsId, text }) => {
   const [record] = await knex("news").select("id").where({ id: newsId });
   if (!record) {
     throw new ControllerException("NEWS_NOT_FOUND", "News have not been found");
@@ -17,7 +17,7 @@ exports.updateNews = async ({ newsId, authorId, text }) => {
   return {};
 };
 
-exports.deleteNews = async ({ newsId, authorId }) => {
+exports.deleteNews = async ({ newsId }) => {
   const [record] = await knex("news").select("id").where({ id: newsId });
   if (!record) {
     throw new ControllerException(
