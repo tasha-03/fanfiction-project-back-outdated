@@ -9,6 +9,7 @@ exports.seed = async function (knex) {
       id: 1,
       login: "example",
       email: "example@example.example",
+      password: "example",
     },
   ]);
 
