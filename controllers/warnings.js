@@ -9,6 +9,6 @@ exports.deleteWarning = async ({warningId}) => {}
 
 exports.getWarningById = async ({warningId}) => {}
 
-exports.getWarningByName = async ({name}) => {}
+exports.getWarningsByName = async ({name}) => {}
 
 exports.getAllWarnings = async () => {}

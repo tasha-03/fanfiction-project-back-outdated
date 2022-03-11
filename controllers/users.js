@@ -162,7 +162,8 @@ exports.changePreferences = async ({
 };
 
 // restore password
-exports.restorePassword = async ({ login }) => { // добавить restorePasswordCode + время на подтверждение, как с подтверждением почты
+exports.restorePassword = async ({ login }) => {
+  // добавить restorePasswordCode + время на подтверждение, как с подтверждением почты
   try {
     const confirmationCode = "000000"; //generate somehow (uuid?)
     const [{ email: email }] = await knex("users")
@@ -205,4 +206,12 @@ exports.getUserById = async ({ userId }) => {
     );
   }
   return record;
+};
+
+exports.getUsersByLogin = async ({ login, limit = 20, page = 1 }) => {
+  const records = await knex("users")
+    .select()
+    .where("login", "ilike", `%${login}%`)
+    .offset(limit * (page - 1));
+  return records;
 };
