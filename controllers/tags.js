@@ -19,8 +19,8 @@ exports.createTag = async ({ name, category = "other" }) => {
 };
 
 exports.updateTag = async ({ tagId, name, category }) => {
-  const [record] = await knex("tags").select("id").where({ id: tagId });
-  if (!record) {
+  const [tag] = await knex("tags").select("id").where({ id: tagId });
+  if (!tag) {
     throw new ControllerException("TAG_NOT_FOUND", "Tag has not been found");
   } else {
     const patch = {};
@@ -37,8 +37,8 @@ exports.updateTag = async ({ tagId, name, category }) => {
 };
 
 exports.deleteTag = async ({ tagId }) => {
-  const [record] = await knex("tags").select("id").where({ id: tagId });
-  if (!record) {
+  const [tag] = await knex("tags").select("id").where({ id: tagId });
+  if (!tag) {
     throw new ControllerException("TAG_NOT_FOUND", "Tag has not been found");
   }
   await knex("tags").where({ id: tagId }).del();
@@ -46,27 +46,29 @@ exports.deleteTag = async ({ tagId }) => {
 };
 
 exports.getTagById = async ({ tagId }) => {
-  const [record] = await knex("tags").select().where({ id: tagId });
-  if (!record) {
+  const [tag] = await knex("tags")
+    .select("id", "name", "category")
+    .where({ id: tagId });
+  if (!tag) {
     throw new ControllerException("TAG_NOT_FOUND", "Tag has not been found");
   } else {
-    return record;
+    return tag;
   }
 };
 
 exports.getTagsByName = async ({ name, category = "all" }) => {
   if (["character", "relationship", "other", "all"].includes(category)) {
     if (category === "all") {
-      const records = await knex("tags")
+      const tags = await knex("tags")
         .select()
         .where("name", "ilike", `%${name}%`);
-      return records;
+      return tags;
     } else {
-      const records = await knex("tags")
+      const tags = await knex("tags")
         .select()
         .where("name", "ilike", `%${name}%`)
         .andWhere("category", category);
-      return records;
+      return tags;
     }
   } else {
     throw new ControllerException(
@@ -74,4 +76,9 @@ exports.getTagsByName = async ({ name, category = "all" }) => {
       "Category has not been found"
     );
   }
+};
+
+exports.getAllTags = async () => {
+  const tags = await knex("tags").select();
+  return tags;
 };

@@ -11,7 +11,6 @@ exports.createFandom = async ({ name, categories = [] }) => {
       ])
       .returning("id");
     for (let i = 0; i < categories.length; i++) {
-      console.log(categories[i]);
       await knex("fandom_category").insert([
         { category: categories[i], fandom_id: fandomId },
       ]);
@@ -26,8 +25,8 @@ exports.createFandom = async ({ name, categories = [] }) => {
 };
 
 exports.updateFandom = async ({ fandomId, name, categories }) => {
-  const [record] = await knex("fandoms").select("id").where({ id: fandomId });
-  if (!record) {
+  const [fandom] = await knex("fandoms").select("id").where({ id: fandomId });
+  if (!fandom) {
     throw new ControllerException(
       "FANDOM_NOT_FOUND",
       "Fandom has not been found"
@@ -64,8 +63,8 @@ exports.updateFandom = async ({ fandomId, name, categories }) => {
 };
 
 exports.deleteFandom = async ({ fandomId }) => {
-  const [record] = await knex("fandoms").select("id").where({ id: fandomId });
-  if (!record) {
+  const [fandom] = await knex("fandoms").select("id").where({ id: fandomId });
+  if (!fandom) {
     throw new ControllerException(
       "FANDOM_NOT_FOUND",
       "Fandom has not been found"
@@ -76,32 +75,48 @@ exports.deleteFandom = async ({ fandomId }) => {
 };
 
 exports.getFandomById = async ({ fandomId }) => {
-  const [record] = await knex("fandoms").select().where({ id: fandomId });
-  if (!record) {
+  const [fandom] = await knex("fandoms").select().where({ id: fandomId });
+  if (!fandom) {
     throw new ControllerException(
       "FANDOM_NOT_FOUND",
       "Fandom has not been found"
     );
   } else {
-    return record;
+    return fandom;
   }
 };
 
 exports.getFandomsByName = async ({ name }) => {
-  const records = await knex("fandoms")
+  const fandoms = await knex("fandoms")
     .select()
     .where("name", "ilike", `%${name}%`);
-  return records;
+  return fandoms;
 };
 
-exports.getFandomByCategory = async ({ category }) => {
+exports.getFandomByCategory = async ({ category, limit = 100, page = 1 }) => {
   const ids = await knex("fandom_category")
     .select("fandom_id as fandomId")
     .where({ category: category });
-  const records = [];
+  const fandoms = [];
   for (let i = 0; i < ids.length; i++) {
-    const record = await knex("fandoms").select().where({ id: ids[i].fandomId });
-    records.push(record);
+    const [fandom] = await knex("fandoms")
+      .select()
+      .where({ id: ids[i].fandomId });
+    fandoms.push(fandom);
   }
-  return records;
+  fandoms.sort((a, b) => {
+    if (a > b) {
+      return 1
+    } else if (a < b) {
+      return -1
+    } else if (a === b) {
+      return 0
+    } 
+  })
+  return fandoms.slice((page - 1) * limit, (page - 1) * limit + limit);
+};
+
+exports.getAllFandoms = async () => {
+  const fandoms = await knex("fandoms").select();
+  return fandoms;
 };

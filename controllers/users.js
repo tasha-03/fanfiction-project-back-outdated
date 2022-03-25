@@ -1,40 +1,42 @@
 const ControllerException = require("../utils/ControllerException");
 const knex = require("../utils/db");
+const { generateCode } = require("../utils/confirmationCode");
+const transporter = require("nodemailer");
+const { hashPass, checkPass } = require("../utils/passHashing");
 
 // register (any)
 exports.register = async ({ login, email, password }) => {
-  const [recordWithLogin] = await knex("users")
+  const [userWithLogin] = await knex("users")
     .select("id")
     .where({ login: login });
-  if (recordWithLogin) {
+  if (userWithLogin) {
     throw new ControllerException("LOGIN_IN_USE", "Login is already in use");
   }
-  const [recordWithEmail] = await knex("users")
+  const [userWithEmail] = await knex("users")
     .select("id")
     .where({ email: email });
-  if (recordWithEmail) {
+  if (userWithEmail) {
     throw new ControllerException("EMAIL_IN_USE", "Email in use");
   }
   const [{ id: userId }] = await knex("users")
-    .insert([{ login, email, password }]) // password hashing
+    .insert([{ login, email, password: hashPass(password) }]) // password hashing
     .returning("id");
   return { userId };
 };
 
 // request email confirmation (user)
 exports.requestEmailConfirmation = async ({ userId }) => {
-  //generate somehow (uuid?)
-  const confirmationCode = "000000";
-  const [record] = await knex("users")
+  const confirmationCode = generateCode();
+  const [user] = await knex("users")
     .select("email_is_confirmed as emailIsConfirmed")
     .where({ id: userId });
-  if (!record) {
+  if (!user) {
     throw new ControllerException(
       "INTERNAL_SERVER_ERROR",
       "Internal server error"
     );
   }
-  if (record.emailIsConfirmed) {
+  if (user.emailIsConfirmed) {
     throw new ControllerException(
       "ALREADY_CONFIRMED",
       "Email has been already confirmed"
@@ -47,45 +49,62 @@ exports.requestEmailConfirmation = async ({ userId }) => {
       updated_at: knex.fn.now(),
     })
     .returning("email");
-  // send email (nodemailer)
+  const transport = await transporter.createTransport({
+    host: process.env.EMAIL_HOST,
+    port: process.env.EMAIL_PORT,
+    secure: process.env.EMAIL_SECURE,
+    auth: {
+      user: process.env.EMAIL_USER,
+      pass: process.env.EMAIL_PASSWORD,
+    },
+  });
+  const message = {
+    from: process.env.EMAIL_USER,
+    to: email,
+    subject: "Fanfiction-Project Email Confirmation",
+    html: `<p><i>A <b>confirmation code</b> for you there:</i></p>
+           <p style="font-size:24px"><b>${confirmationCode}</b></p>
+           <p>If you did not create an account on <a href="${process.env.SITE_URL}">${process.env.SITE_URL}</a>,
+           <br/>please ignore this message</p>`,
+  };
+  await transport.sendMail(message, (err, info) => {
+    if (err) {
+      throw new ControllerException("MAIL_NOT_SENT", "Mail has not been sent");
+    }
+  });
   return {};
 };
 
 // confirm email (user)
 exports.confirmEmail = async ({ userId, confirmationCode }) => {
-  try {
-    const [{ email_confirmation_code: emailConfirmationCode }] = await knex(
-      "users"
-    )
-      .where({ id: userId })
-      .returning("email_confirmation_code");
-
-    //compare confirmation codes
-    if (emailConfirmationCode === confirmationCode) {
-      await knex("users").where({ id: userId }).update({
-        email_is_confirmed: true,
-        updated_at: knex.fn.now(),
-      });
-    } else {
-      throw new ControllerException(
-        "CONFIRMATION_CODE_IS_INVALID",
-        "Confirmation code is invalid"
-      );
-    }
-
-    return {};
-  } catch (error) {
-    throw new ControllerException("", "");
+  const [{ email_confirmation_code: emailConfirmationCode }] = await knex(
+    "users"
+  )
+    .where({ id: userId })
+    .returning("email_confirmation_code");
+  if (emailConfirmationCode === confirmationCode) {
+    await knex("users").where({ id: userId }).update({
+      email_is_confirmed: true,
+      updated_at: knex.fn.now(),
+    });
+  } else {
+    throw new ControllerException(
+      "CONFIRMATION_CODE_IS_INVALID",
+      "Confirmation code is invalid"
+    );
   }
+  return {};
 };
 
 // login (any)
 exports.login = async ({ login, password }) => {
-  const [record] = await knex("users").select("id").where({ login, password });
-  if (!record) {
+  const [user] = await knex("users")
+    .select("id", "password as hashedPass")
+    .where({ login });
+  if (!checkPass(password, user.hashedPass)) {
     throw new ControllerException("WRONG_CREDENTIALS", "Wrong credentials");
   } else {
-    return { userId: record.id };
+    return { userId: user.id };
   }
 };
 
@@ -113,7 +132,7 @@ exports.changeRole = async ({ userId, role }) => {
     });
     return {};
   } catch (error) {
-    throw new ControllerException("", "");
+    throw new ControllerException("USER_NOT_FOUND", "User has not been found");
   }
 };
 
@@ -126,7 +145,7 @@ exports.deactivateProfile = async ({ userId }) => {
     });
     return {};
   } catch (error) {
-    throw new ControllerException("", "");
+    throw new ControllerException("USER_NOT_FOUND", "User has not been found");
   }
 };
 
@@ -139,7 +158,7 @@ exports.activateProfile = async ({ userId }) => {
     });
     return {};
   } catch (error) {
-    throw new ControllerException("", "");
+    throw new ControllerException("USER_NOT_FOUND", "User has not been found");
   }
 };
 
@@ -157,61 +176,110 @@ exports.changePreferences = async ({
     });
     return {};
   } catch (error) {
-    throw new ControllerException("", "");
+    throw new ControllerException("USER_NOT_FOUND", "User has not been found");
   }
 };
 
-// restore password
-exports.restorePassword = async ({ login }) => {
-  // добавить restorePasswordCode + время на подтверждение, как с подтверждением почты
-  try {
-    const confirmationCode = "000000"; //generate somehow (uuid?)
-    const [{ email: email }] = await knex("users")
-      .where({ login: login })
-      .update({
-        email_confirmation_code: confirmationCode,
-        updated_at: knex.fn.now(),
-      })
-      .returning("email");
-    //send email
-    if (emailConfirmationCode === confirmationCode) {
-      return {};
-    } else {
-      throw new ControllerException(
-        "CONFIRMATION_CODE_IS_INVALID",
-        "Confirmation code is invalid"
-      );
+// request restore password (any)
+exports.requestRestorePassword = async ({ login }) => {
+  const confirmationCode = generateCode();
+  const [{ email: email }] = await knex("users")
+    .where({ login: login })
+    .update({
+      email_confirmation_code: confirmationCode,
+      updated_at: knex.fn.now(),
+    })
+    .returning("email");
+  const transport = await transporter.createTransport({
+    host: process.env.EMAIL_HOST,
+    port: process.env.EMAIL_PORT,
+    secure: process.env.EMAIL_SECURE,
+    auth: {
+      user: process.env.EMAIL_USER,
+      pass: process.env.EMAIL_PASSWORD,
+    },
+  });
+  const message = {
+    from: process.env.EMAIL_USER,
+    to: email,
+    subject: "Fanfiction-Project Email Confirmation",
+    html: `<p><i>A <b>confirmation code</b> for you there:</i></p>
+               <p style="font-size:24px"><b>${confirmationCode}</b></p>
+               <p>If you did not create an account on <a href="${process.env.SITE_URL}">${process.env.SITE_URL}</a>,
+               <br/>please ignore this message</p>`,
+  };
+  await transport.sendMail(message, (err, info) => {
+    if (err) {
+      throw new ControllerException("MAIL_NOT_SENT", "Mail has not been sent");
     }
-  } catch (error) {
-    throw new ControllerException("", "");
+  });
+  if (emailConfirmationCode === confirmationCode) {
+    return {};
+  } else {
+    throw new ControllerException(
+      "CONFIRMATION_CODE_IS_INVALID",
+      "Confirmation code is invalid"
+    );
+  }
+};
+
+// confirm request restore password (any)
+exports.confirmRequestRestorePassword = async ({ login, confirmationCode }) => {
+  const [{ email_confirmation_code: emailConfirmationCode }] = await knex(
+    "users"
+  )
+    .where({ login: login })
+    .returning("email_confirmation_code");
+  if (emailConfirmationCode !== confirmationCode) {
+    throw new ControllerException(
+      "CONFIRMATION_CODE_IS_INVALID",
+      "Confirmation code is invalid"
+    );
+  }
+  return true;
+};
+
+// restore password (user)
+exports.restorePassword = async ({
+  userId,
+  password,
+  passRestored = false,
+}) => {
+  if (passRestored) {
+    await knex("users")
+      .update({ password: hashPass(password) })
+      .where({ id: userId });
+    return {};
+  } else {
+    throw new ControllerException("ACCESS_DENIED", "Access denied");
   }
 };
 
 exports.getAllUsers = async ({ limit = 20, page = 1 }) => {
-  const records = await knex("users")
+  const users = await knex("users")
     .select("id", "login")
     .limit(limit)
     .offset(limit * (page - 1));
-  return records;
+  return users;
 };
 
 exports.getUserById = async ({ userId }) => {
-  const [record] = await knex("users")
-    .select("id", "login", "role")
+  const [user] = await knex("users")
+    .select("id as userId", "login", "role")
     .where({ id: userId });
-  if (!record) {
+  if (!user) {
     throw new ControllerException(
       "INTERNAL_SERVER_ERROR",
       "Internal server error"
     );
   }
-  return record;
+  return user;
 };
 
 exports.getUsersByLogin = async ({ login, limit = 20, page = 1 }) => {
-  const records = await knex("users")
+  const users = await knex("users")
     .select()
     .where("login", "ilike", `%${login}%`)
     .offset(limit * (page - 1));
-  return records;
+  return users;
 };

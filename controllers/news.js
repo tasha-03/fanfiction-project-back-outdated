@@ -7,8 +7,8 @@ exports.createNews = async ({ authorId, text }) => {
 };
 
 exports.updateNews = async ({ newsId, text }) => {
-  const [record] = await knex("news").select("id").where({ id: newsId });
-  if (!record) {
+  const [news] = await knex("news").select("id").where({ id: newsId });
+  if (!news) {
     throw new ControllerException("NEWS_NOT_FOUND", "News have not been found");
   }
   await knex("news")
@@ -18,8 +18,8 @@ exports.updateNews = async ({ newsId, text }) => {
 };
 
 exports.deleteNews = async ({ newsId }) => {
-  const [record] = await knex("news").select("id").where({ id: newsId });
-  if (!record) {
+  const [news] = await knex("news").select("id").where({ id: newsId });
+  if (!news) {
     throw new ControllerException(
       "INTERNAL_SERVER_ERROR",
       "Internal server error"
@@ -30,23 +30,23 @@ exports.deleteNews = async ({ newsId }) => {
 };
 
 exports.getAllNews = async ({ limit = 20, page = 1 }) => {
-  const records = await knex("news")
+  const news = await knex("news")
     .select()
     .limit(limit)
     .offset(limit * (page - 1));
-  if (!records) {
+  if (!news) {
     throw new ControllerException("NEWS_NOT_FOUND", "News have not been found");
   } else {
-    return records;
+    return news;
   }
 };
 
 exports.getNewsById = async ({ newsId }) => {
-  const [record] = await knex("news").select().where({ id: newsId });
-  if (!record) {
+  const [news] = await knex("news").select().where({ id: newsId });
+  if (!news) {
     throw new ControllerException("NEWS_NOT_FOUND", "News have not been found");
   } else {
-    return record;
+    return news;
   }
 };
 
