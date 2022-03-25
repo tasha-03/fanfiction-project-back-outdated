@@ -1,21 +1,28 @@
-const jwt = require("jsonwebtoken");
+const { wrap } = require("async-middleware");
 const usersController = require("../../controllers/users");
+const { verify: verifyToken } = require("../../utils/token");
 
-const auth = (role) => async (req, res, next) => {
-  const token = req.headers.token;
-  let data = {};
-  try {
-    data = jwt.verify(token, process.env.JWT_SECRET_KEY);
-  } catch (err) {
-    res.send({ success: false, code: "ACCESS_DENIED" });
-  }
-
-  const userId = data.userId;
-  const user = usersController.getUserById({ userId });
-  if (user.role !== role) {
-    res.send({ success: false, code: "ACCESS_DENIED" });
-  }
-
-  req.user = user;
-  next();
+const matchRole = (role, targetRole) => {
+  return (
+    (role === "USER" && targetRole === "USER") ||
+    (role === "ADMIN" && (targetRole === "USER" || targetRole === "ADMIN"))
+  );
 };
+
+const auth = (targetRole) =>
+  wrap(async (req, res, next) => {
+    const authHeader = req.headers.authorization || "";
+    const token = (authHeader.match(/^Bearer\s*(.*)$/) || [])[1];
+
+    const userId = verifyToken(token);
+
+    const user = await usersController.getUserById({ userId });
+    if (!matchRole(user.role, targetRole)) {
+      res.send({ success: false, code: "ACCESS_DENIED" });
+      return;
+    }
+
+    req.user = user;
+    next();
+  });
+module.exports = auth;
