@@ -21,7 +21,7 @@ router.post(
   })
 );
 
-router.post(
+router.get(
   "/email/confirm/request",
   auth("USER"),
   wrap(async (req, res) => {
@@ -34,10 +34,10 @@ router.post(
   "/email/confirm",
   auth("USER"),
   wrap(async (req, res) => {
-    const { code } = req.body;
+    const { confirmationCode } = req.body;
     await usersController.confirmEmail({
       userId: req.user.userId,
-      confirmationCode: code,
+      confirmationCode: confirmationCode,
     });
     res.send({ success: true });
   })
@@ -50,6 +50,46 @@ router.post(
     const { userId } = await usersController.login({ login, password });
     const token = signToken(userId);
     res.send({ success: true, token });
+  })
+);
+
+router.get(
+  "/myself",
+  auth("USER"),
+  wrap(async (req, res) => {
+    const user = await usersController.getUserById({ userId: req.user.userId });
+    res.send({ success: true, user });
+  })
+);
+
+router.get(
+  "/:id",
+  wrap(async (req, res) => {
+    const user = await usersController.getUserById({ userId: req.params.id });
+    res.send({ success: true, user });
+  })
+);
+
+router.get(
+  "/",
+  wrap(async (req, res) => {
+    const users = await usersController.getAllUsers({
+      limit: req.query.limit,
+      page: req.query.page,
+    });
+    res.send({ success: true, users });
+  })
+);
+
+router.post(
+  "/",
+  wrap(async (req, res) => {
+    const users = await usersController.getUsersByLogin({
+      login: req.body.login,
+      limit: req.query.limit,
+      page: req.query.page,
+    });
+    res.send({ success: true, users });
   })
 );
 
