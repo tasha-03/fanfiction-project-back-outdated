@@ -63,9 +63,9 @@ exports.up = async (knex) => {
   await knex.schema.createTable("parts", (table) => {
     table.increments("id");
     table.integer("work_id").notNullable();
-    table.text("description").notNullable();
+    table.text("description").notNullable().defaultTo("");
     table.text("note");
-    table.text("text").notNullable();
+    table.text("text").notNullable().defaultTo("");
     table.integer("order").notNullable();
     table.boolean("is_visible").notNullable().defaultTo(false);
     table.timestamp("created_at").notNullable().defaultTo(knex.fn.now());

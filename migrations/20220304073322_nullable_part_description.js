@@ -14,6 +14,6 @@ exports.up = async (knex) => {
  */
 exports.down = async (knex) => {
     await knex.schema.alterTable("parts", (table) => {
-        table.text("description").notNullable().alter()
+        table.text("description").notNullable().defaultTo("").alter()
     })
 };
