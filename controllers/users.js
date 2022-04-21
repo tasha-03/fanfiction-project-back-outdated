@@ -8,18 +8,18 @@ const { hashPass, checkPass } = require("../utils/passHashing");
 exports.register = async ({ login, email, password }) => {
   const [userWithLogin] = await knex("users")
     .select("id")
-    .where({ login: login });
+    .where({ login: login.toLowerCase() });
   if (userWithLogin) {
     throw new ControllerException("LOGIN_IN_USE", "Login is already in use");
   }
   const [userWithEmail] = await knex("users")
     .select("id")
-    .where({ email: email });
+    .where({ email: email.toLowerCase() });
   if (userWithEmail) {
     throw new ControllerException("EMAIL_IN_USE", "Email in use");
   }
   const [{ id: userId }] = await knex("users")
-    .insert([{ login, email, password: hashPass(password) }]) // password hashing
+    .insert([{ login: login.toLowerCase(), email: email.toLowerCase(), password: await hashPass(password) }]) // password hashing
     .returning("id");
   return { userId };
 };
@@ -100,8 +100,11 @@ exports.confirmEmail = async ({ userId, confirmationCode }) => {
 exports.login = async ({ login, password }) => {
   const [user] = await knex("users")
     .select("id", "password as hashedPass")
-    .where({ login });
-  if (!checkPass(password, user.hashedPass)) {
+    .where({ login: login.toLowerCase() });
+  if(!user) {
+    throw new ControllerException("WRONG_CREDENTIALS", "Wrong credentials");
+  }
+  if (!(await checkPass(password, user.hashedPass))) {
     throw new ControllerException("WRONG_CREDENTIALS", "Wrong credentials");
   } else {
     return { userId: user.id };
@@ -112,8 +115,8 @@ exports.login = async ({ login, password }) => {
 exports.editProfile = async ({ userId, login, email, password }) => {
   try {
     await knex("users").where({ id: userId }).update({
-      login: login,
-      email: email,
+      login: login.toLowerCase(),
+      email: email.toLowerCase(),
       password: password,
       updated_at: knex.fn.now(),
     });
@@ -127,7 +130,7 @@ exports.editProfile = async ({ userId, login, email, password }) => {
 exports.changeRole = async ({ userId, role }) => {
   try {
     await knex("users").where({ id: userId }).update({
-      role: role,
+      role: role.toUpperCase(),
       updated_at: knex.fn.now(),
     });
     return {};
@@ -184,12 +187,12 @@ exports.changePreferences = async ({
 exports.requestRestorePassword = async ({ login }) => {
   const confirmationCode = generateCode();
   const [{ email: email }] = await knex("users")
-    .where({ login: login })
+    .where({ login: login.toLowerCase() })
     .update({
       email_confirmation_code: confirmationCode,
       updated_at: knex.fn.now(),
     })
-    .returning("email");
+    .returning("email".toLowerCase());
   const transport = await transporter.createTransport({
     host: process.env.EMAIL_HOST,
     port: process.env.EMAIL_PORT,
@@ -202,11 +205,12 @@ exports.requestRestorePassword = async ({ login }) => {
   const message = {
     from: process.env.EMAIL_USER,
     to: email,
-    subject: "Fanfiction-Project Email Confirmation",
-    html: `<p><i>A <b>confirmation code</b> for you there:</i></p>
-               <p style="font-size:24px"><b>${confirmationCode}</b></p>
-               <p>If you did not create an account on <a href="${process.env.SITE_URL}">${process.env.SITE_URL}</a>,
-               <br/>please ignore this message</p>`,
+    subject: "Fanfiction-Project Password Restore Request",
+    html: `<p>Dear ${login.toLowerCase()}</p>
+           <p><i>A <b>password restore code</b> for you there:</i></p>
+           <p style="font-size:24px"><b>${confirmationCode}</b></p>
+           <p>If you did not create an account on <a href="${process.env.SITE_URL}">${process.env.SITE_URL}</a>,
+           <br/>please ignore this message</p>`,
   };
   await transport.sendMail(message, (err, info) => {
     if (err) {
@@ -228,7 +232,7 @@ exports.confirmRequestRestorePassword = async ({ login, confirmationCode }) => {
   const [{ email_confirmation_code: emailConfirmationCode }] = await knex(
     "users"
   )
-    .where({ login: login })
+    .where({ login: login.toLowerCase() })
     .returning("email_confirmation_code");
   if (emailConfirmationCode !== confirmationCode) {
     throw new ControllerException(
@@ -247,7 +251,7 @@ exports.restorePassword = async ({
 }) => {
   if (passRestored) {
     await knex("users")
-      .update({ password: hashPass(password) })
+      .update({ password: await hashPass(password) })
       .where({ id: userId });
     return {};
   } else {
@@ -279,7 +283,7 @@ exports.getUserById = async ({ userId }) => {
 exports.getUsersByLogin = async ({ login, limit = 20, page = 1 }) => {
   const users = await knex("users")
     .select()
-    .where("login", "ilike", `%${login}%`)
+    .where("login", "ilike", `%${login.toLowerCase()}%`)
     .offset(limit * (page - 1));
   return users;
 };
