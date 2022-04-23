@@ -2,8 +2,11 @@ require("dotenv").config();
 
 const express = require("express");
 const apiRouter = require("./routes");
+const morgan = require("morgan");
 
 const app = express();
+
+app.use(morgan(`[:date[clf]] HTTP/:http-version ":method :url" :status`));
 
 app.use("/api/v1", apiRouter);
 

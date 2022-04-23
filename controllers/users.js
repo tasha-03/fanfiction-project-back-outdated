@@ -19,7 +19,13 @@ exports.register = async ({ login, email, password }) => {
     throw new ControllerException("EMAIL_IN_USE", "Email in use");
   }
   const [{ id: userId }] = await knex("users")
-    .insert([{ login: login.toLowerCase(), email: email.toLowerCase(), password: await hashPass(password) }]) // password hashing
+    .insert([
+      {
+        login: login.toLowerCase(),
+        email: email.toLowerCase(),
+        password: await hashPass(password),
+      },
+    ]) // password hashing
     .returning("id");
   return { userId };
 };
@@ -84,6 +90,7 @@ exports.confirmEmail = async ({ userId, confirmationCode }) => {
     .returning("email_confirmation_code");
   if (emailConfirmationCode === confirmationCode) {
     await knex("users").where({ id: userId }).update({
+      email_confirmation_code: null,
       email_is_confirmed: true,
       updated_at: knex.fn.now(),
     });
@@ -101,7 +108,7 @@ exports.login = async ({ login, password }) => {
   const [user] = await knex("users")
     .select("id", "password as hashedPass")
     .where({ login: login.toLowerCase() });
-  if(!user) {
+  if (!user) {
     throw new ControllerException("WRONG_CREDENTIALS", "Wrong credentials");
   }
   if (!(await checkPass(password, user.hashedPass))) {
@@ -209,7 +216,9 @@ exports.requestRestorePassword = async ({ login }) => {
     html: `<p>Dear ${login.toLowerCase()}</p>
            <p><i>A <b>password restore code</b> for you there:</i></p>
            <p style="font-size:24px"><b>${confirmationCode}</b></p>
-           <p>If you did not create an account on <a href="${process.env.SITE_URL}">${process.env.SITE_URL}</a>,
+           <p>If you did not create an account on <a href="${
+             process.env.SITE_URL
+           }">${process.env.SITE_URL}</a>,
            <br/>please ignore this message</p>`,
   };
   await transport.sendMail(message, (err, info) => {
@@ -259,6 +268,7 @@ exports.restorePassword = async ({
   }
 };
 
+// get all users (any)
 exports.getAllUsers = async ({ limit = 20, page = 1 }) => {
   const users = await knex("users")
     .select("id", "login")
@@ -267,10 +277,19 @@ exports.getAllUsers = async ({ limit = 20, page = 1 }) => {
   return users;
 };
 
-exports.getUserById = async ({ userId }) => {
-  const [user] = await knex("users")
-    .select("id as userId", "login", "role")
-    .where({ id: userId });
+// get user by id (any)
+exports.getUserById = async ({ userId, tz = "UTC" }) => {
+  const record = (
+    await knex.raw(
+      `select id as userId, login, role, email_is_confirmed as emailIsConfirmed, (created_at::timestamp at time zone 'UTC' at time zone '${tz}') as createdAt from "users" where id = ${userId}`
+    )
+  ).rows[0];
+  const user = {};
+  user.userId = userId;
+  user.login = record.login;
+  user.role = record.role;
+  user.emailIsConfirmed = record.emailisconfirmed;
+  user.createdAt = record.createdat;
   if (!user) {
     throw new ControllerException(
       "INTERNAL_SERVER_ERROR",
@@ -280,6 +299,7 @@ exports.getUserById = async ({ userId }) => {
   return user;
 };
 
+// get users by login
 exports.getUsersByLogin = async ({ login, limit = 20, page = 1 }) => {
   const users = await knex("users")
     .select()

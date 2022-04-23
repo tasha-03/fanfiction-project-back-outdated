@@ -57,15 +57,21 @@ router.get(
   "/myself",
   auth("USER"),
   wrap(async (req, res) => {
-    const user = await usersController.getUserById({ userId: req.user.userId });
-    res.send({ success: true, user });
+    // const user = await usersController.getUserById({
+    //   userId: req.user.userId,
+    //   tz: req.query.tz,
+    // });
+    res.send({ success: true, user: req.user });
   })
 );
 
 router.get(
   "/:id",
   wrap(async (req, res) => {
-    const user = await usersController.getUserById({ userId: req.params.id });
+    const user = await usersController.getUserById({
+      userId: req.params.id,
+      tz: req.query.tz,
+    });
     res.send({ success: true, user });
   })
 );

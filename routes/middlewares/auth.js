@@ -16,7 +16,7 @@ const auth = (targetRole) =>
 
     const userId = verifyToken(token);
 
-    const user = await usersController.getUserById({ userId });
+    const user = await usersController.getUserById({ userId, tz: req.query.tz });
     if (!matchRole(user.role, targetRole)) {
       res.send({ success: false, code: "ACCESS_DENIED" });
       return;

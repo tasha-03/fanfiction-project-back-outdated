@@ -5,7 +5,7 @@
   "main": "index.js",
   "scripts": {
     "start": "node server.js",
-    "test": "jest --collectCoverage --runInBand --testLocationInResults"
+    "test": "jest --collectCoverage --runInBand --testLocationInResults --detectOpenHandles"
   },
   "author": "tasha-03",
   "license": "ISC",
@@ -16,6 +16,7 @@
     "express": "^4.17.3",
     "jsonwebtoken": "^8.5.1",
     "knex": "^1.0.3",
+    "morgan": "^1.10.0",
     "nodemailer": "^6.7.2",
     "pg": "^8.7.3"
   },
