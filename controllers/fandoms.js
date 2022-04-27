@@ -89,7 +89,8 @@ exports.getFandomById = async ({ fandomId }) => {
 exports.getFandomsByName = async ({ name }) => {
   const fandoms = await knex("fandoms")
     .select()
-    .where("name", "ilike", `%${name}%`);
+    .where("name", "ilike", `%${name}%`)
+    .limit(20);
   return fandoms;
 };
 
@@ -106,13 +107,13 @@ exports.getFandomByCategory = async ({ category, limit = 100, page = 1 }) => {
   }
   fandoms.sort((a, b) => {
     if (a > b) {
-      return 1
+      return 1;
     } else if (a < b) {
-      return -1
+      return -1;
     } else if (a === b) {
-      return 0
-    } 
-  })
+      return 0;
+    }
+  });
   return fandoms.slice((page - 1) * limit, (page - 1) * limit + limit);
 };
 

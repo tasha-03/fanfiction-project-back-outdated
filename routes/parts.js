@@ -17,7 +17,7 @@ router.post(
       note: req.body.note,
       text: req.body.text,
       order: req.body.order,
-      is_visible: req.body.is_visible,
+      isVisible: req.body.isVisible,
     });
     res.send({ success: true, partId });
   })
@@ -34,7 +34,7 @@ router.patch(
       description: req.body.description,
       note: req.body.note,
       text: req.body.text,
-      is_visible: req.body.is_visible,
+      isVisible: req.body.isVisible,
     });
     res.send({ success: true });
   })

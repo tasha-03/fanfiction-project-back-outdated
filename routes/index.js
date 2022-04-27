@@ -4,11 +4,13 @@ const workRouter = require("./works");
 const warningRouter = require("./warnings");
 const tagRouter = require("./tags");
 const fandomRouter = require("./fandoms");
+const adminRouter = require("./admin");
 
 const router = express.Router();
 
 router.use(express.json());
 
+router.use("/admin", adminRouter);
 router.use("/users", userRouter);
 router.use("/works", workRouter);
 router.use("/warnings", warningRouter);
@@ -20,10 +22,13 @@ router.use((req, res) => {
 });
 
 router.use((err, req, res, next) => {
-  console.log(err);
   if (err.name === "CONTROLLER_EXCEPTION") {
+    console.log(
+      `Controller Exception: {\n  name: ${err.name},\n  exceptionCode: ${err.exceptionCode},\n  message: ${err.message}\n}`
+    );
     res.send({ success: false, code: err.exceptionCode, message: err.message });
   } else {
+    console.log(`Error occured:`, err);
     res.send({ success: false, code: "INTERNAL_ERROR" });
   }
 });
