@@ -36,6 +36,7 @@ exports.requestEmailConfirmation = async ({ userId }) => {
   const [user] = await knex("users")
     .select("email_is_confirmed as emailIsConfirmed")
     .where({ id: userId });
+  console.log(user);
   if (!user) {
     throw new ControllerException(
       "INTERNAL_SERVER_ERROR",
@@ -45,7 +46,7 @@ exports.requestEmailConfirmation = async ({ userId }) => {
   if (user.emailIsConfirmed) {
     throw new ControllerException(
       "ALREADY_CONFIRMED",
-      "Email has been already confirmed"
+      "Email has already been confirmed"
     );
   }
   const [{ email: email }] = await knex("users")
@@ -55,7 +56,7 @@ exports.requestEmailConfirmation = async ({ userId }) => {
       updated_at: knex.fn.now(),
     })
     .returning("email");
-  const transport = await transporter.createTransport({
+  const transport = transporter.createTransport({
     host: process.env.EMAIL_HOST,
     port: process.env.EMAIL_PORT,
     secure: process.env.EMAIL_SECURE,
@@ -73,7 +74,7 @@ exports.requestEmailConfirmation = async ({ userId }) => {
            <p>If you did not create an account on <a href="${process.env.SITE_URL}">${process.env.SITE_URL}</a>,
            <br/>please ignore this message</p>`,
   };
-  await transport.sendMail(message, (err, info) => {
+  transport.sendMail(message, (err, info) => {
     if (err) {
       throw new ControllerException("MAIL_NOT_SENT", "Mail has not been sent");
     }
@@ -135,15 +136,19 @@ exports.editProfile = async ({ userId, login, email, password }) => {
 
 // change role (admin)
 exports.changeRole = async ({ userId, role }) => {
-  try {
-    await knex("users").where({ id: userId }).update({
-      role: role.toUpperCase(),
-      updated_at: knex.fn.now(),
-    });
-    return {};
-  } catch (error) {
+  const patch = {};
+  patch.updated_at = knex.fn.now();
+  if (role !== undefined) patch.role = role.toUpperCase();
+  const [user] = await knex("users").select("login").where({ id: userId });
+  if (!user) {
     throw new ControllerException("USER_NOT_FOUND", "User has not been found");
   }
+  console.log(user);
+  if (user.login === "fanfiction-project") {
+    throw new ControllerException("FORBIDDEN", "Forbidden");
+  }
+  await knex("users").select("login").where({ id: userId }).update(patch);
+  return {};
 };
 
 // deactivate profile (user)
@@ -176,14 +181,15 @@ exports.activateProfile = async ({ userId }) => {
 exports.changePreferences = async ({
   userId,
   dark_theme,
-  email_notitfications_on,
+  emailNotitficationsOn,
 }) => {
   try {
-    await knex("users").where({ id: userId }).update({
-      dark_theme: dark_theme,
-      email_notitfications_on: email_notitfications_on,
-      updated_at: knex.fn.now(),
-    });
+    const patch = {};
+    patch.updated_at = knex.fn.now();
+    if (dark_theme !== undefined) patch.dark_theme = dark_theme;
+    if (emailNotitficationsOn)
+      patch.email_notitfications_on = emailNotitficationsOn;
+    await knex("users").where({ id: userId }).update(patch);
     return {};
   } catch (error) {
     throw new ControllerException("USER_NOT_FOUND", "User has not been found");
@@ -200,7 +206,7 @@ exports.requestRestorePassword = async ({ login }) => {
       updated_at: knex.fn.now(),
     })
     .returning("email".toLowerCase());
-  const transport = await transporter.createTransport({
+  const transport = transporter.createTransport({
     host: process.env.EMAIL_HOST,
     port: process.env.EMAIL_PORT,
     secure: process.env.EMAIL_SECURE,
@@ -221,7 +227,7 @@ exports.requestRestorePassword = async ({ login }) => {
            }">${process.env.SITE_URL}</a>,
            <br/>please ignore this message</p>`,
   };
-  await transport.sendMail(message, (err, info) => {
+  transport.sendMail(message, (err, info) => {
     if (err) {
       throw new ControllerException("MAIL_NOT_SENT", "Mail has not been sent");
     }
@@ -268,15 +274,6 @@ exports.restorePassword = async ({
   }
 };
 
-// get all users (any)
-exports.getAllUsers = async ({ limit = 20, page = 1 }) => {
-  const users = await knex("users")
-    .select("id", "login")
-    .limit(limit)
-    .offset(limit * (page - 1));
-  return users;
-};
-
 // get user by id (any)
 exports.getUserById = async ({ userId, tz = "UTC" }) => {
   const record = (
@@ -284,26 +281,25 @@ exports.getUserById = async ({ userId, tz = "UTC" }) => {
       `select id as userId, login, role, email_is_confirmed as emailIsConfirmed, (created_at::timestamp at time zone 'UTC' at time zone '${tz}') as createdAt from "users" where id = ${userId}`
     )
   ).rows[0];
+  if (!record) {
+    throw new ControllerException("USER_NOT_FOUND", "User has not been found");
+  }
   const user = {};
   user.userId = userId;
   user.login = record.login;
   user.role = record.role;
   user.emailIsConfirmed = record.emailisconfirmed;
   user.createdAt = record.createdat;
-  if (!user) {
-    throw new ControllerException(
-      "INTERNAL_SERVER_ERROR",
-      "Internal server error"
-    );
-  }
   return user;
 };
 
 // get users by login
-exports.getUsersByLogin = async ({ login, limit = 20, page = 1 }) => {
+exports.getUsersByLogin = async ({ login = "", limit = 20, page = 1 }) => {
   const users = await knex("users")
-    .select()
-    .where("login", "ilike", `%${login.toLowerCase()}%`)
+    .select("id as userId", "login")
+    .whereRaw(`login similar to '%${login}%'`)
+    .orderBy("login", "asc")
+    .limit(limit)
     .offset(limit * (page - 1));
   return users;
 };
