@@ -4,8 +4,8 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "start": "node server.js",
-    "test": "jest --collectCoverage --runInBand --testLocationInResults --detectOpenHandles"
+    "start": "nodemon server.js",
+    "test": "jest --collectCoverage --runInBand --testLocationInResults --forceExit"
   },
   "author": "tasha-03",
   "license": "ISC",
@@ -14,6 +14,7 @@
     "bcrypt": "^5.0.1",
     "dotenv": "^16.0.0",
     "express": "^4.17.3",
+    "express-validator": "^6.14.0",
     "jsonwebtoken": "^8.5.1",
     "knex": "^1.0.3",
     "morgan": "^1.10.0",
@@ -21,6 +22,7 @@
     "pg": "^8.7.3"
   },
   "devDependencies": {
-    "jest": "^27.5.1"
+    "jest": "^27.5.1",
+    "nodemon": "^2.0.15"
   }
 }
