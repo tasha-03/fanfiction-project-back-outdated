@@ -3,7 +3,7 @@ const ControllerException = require("./ControllerException");
 
 exports.sign = (userId) => {
   return jwt.sign({ userId }, process.env.JWT_SECRET_KEY, {
-    expiresIn: 60 * 60,
+    expiresIn: 60 * 60 * 24,
   });
 };
 

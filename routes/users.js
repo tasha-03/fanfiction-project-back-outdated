@@ -1,13 +1,41 @@
 const express = require("express");
 const usersController = require("../controllers/users");
+const vkAuth = require("../controllers/vk-auth");
 const auth = require("./middlewares/auth");
 const { sign: signToken } = require("../utils/token");
 const { wrap } = require("async-middleware");
 const validate = require("./middlewares/validate");
 const { body, param, query } = require("express-validator");
 const { TZs } = require("./middlewares/TZs");
+const { buildQueryString } = require("../utils/buildQueryString");
+const scopes = ["email"];
 
 const router = express.Router();
+
+router.get("/vk-auth", (req, res) => {
+  console.log("Redirecting to: VK.com");
+  res.send({
+    success: true,
+    url: `https://oauth.vk.com/authorize${buildQueryString([
+      { client_id: process.env.VK_APP_CLIENT_ID },
+      { redirect_uri: `http://localhost:3000/vk-confirm` },
+      { response_type: "code" },
+      { scope: scopes.join("+") },
+      { state: "{}" },
+    ])}`,
+  });
+});
+
+router.get(
+  "/vk-complete",
+  wrap(async (req, res) => {
+    console.log(req.query.code);
+    const { userId } = await vkAuth.getAccessToken(String(req.query.code));
+    const token = signToken(userId[0].userId);
+    console.log(token);
+    res.send({ success: true, token });
+  })
+);
 
 router.post(
   "/signup",
@@ -81,6 +109,20 @@ router.post(
   })
 );
 
+router.post(
+  "/preferences/:userId",
+  wrap(async (req, res) => {
+    await usersController.changeProfile({
+      userId: req.params.userId,
+      login: req.body.login,
+      oldPassword: req.body.oldPassword,
+      password: req.body.password,
+      bios: req.body.bios,
+    });
+    res.send({ success: true });
+  })
+);
+
 router.get(
   "/myself",
   query("tz").isIn(TZs),
@@ -88,6 +130,60 @@ router.get(
   auth("USER"),
   wrap(async (req, res) => {
     res.send({ success: true, user: req.user });
+  })
+);
+
+router.get(
+  "/deactivate",
+  auth("USER"),
+  wrap(async (req, res) => {
+    await usersController.deactivateProfile({ userId: req.user.userId });
+    res.send({ success: true });
+  })
+);
+
+router.get(
+  "/activate",
+  auth("USER"),
+  wrap(async (req, res) => {
+    await usersController.activateProfile({ userId: req.user.userId });
+    res.send({ success: true });
+  })
+);
+
+router.post(
+  "/password/restore",
+  auth("USER"),
+  wrap(async (req, res) => {
+    await usersController.restorePassword({
+      userId: req.user.userId,
+      password: req.body.password,
+      passRestored: true,
+    });
+    res.send({ success: true });
+  })
+);
+
+router.get(
+  "/logins/:userLogin",
+  wrap(async (req, res) => {
+    const user = await usersController.getUserByLogin({
+      login: req.params.userLogin,
+    });
+    res.send({ success: true, user });
+  })
+);
+
+router.get(
+  "/:id",
+  param("id").isInt(),
+  validate(),
+  wrap(async (req, res) => {
+    const user = await usersController.getUserById({
+      userId: req.params.id,
+      tz: req.query.tz,
+    });
+    res.send({ success: true, user });
   })
 );
 
@@ -110,50 +206,6 @@ router.post(
       page: req.query.page,
     });
     res.send({ success: true, users });
-  })
-);
-
-router.get(
-  "/deactivate",
-  auth("USER"),
-  wrap(async (req, res) => {
-    await usersController.deactivateProfile({ userId: req.user.userId });
-    res.send({ success: true });
-  })
-);
-
-router.get(
-  "/activate",
-  auth("USER"),
-  wrap(async (req, res) => {
-    await usersController.activateProfile({ userId: req.user.userId });
-    res.send({ success: true });
-  })
-);
-
-router.get(
-  "/:id",
-  param("id").isInt(),
-  validate(),
-  wrap(async (req, res) => {
-    const user = await usersController.getUserById({
-      userId: req.params.id,
-      tz: req.query.tz,
-    });
-    res.send({ success: true, user });
-  })
-);
-
-router.post(
-  "/password/restore",
-  auth("USER"),
-  wrap(async (req, res) => {
-    await usersController.restorePassword({
-      userId: req.user.userId,
-      password: req.body.password,
-      passRestored: true,
-    });
-    res.send({ success: true });
   })
 );
 

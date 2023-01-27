@@ -90,7 +90,8 @@ exports.getFandomsByName = async ({ name }) => {
   const fandoms = await knex("fandoms")
     .select()
     .where("name", "ilike", `%${name}%`)
-    .limit(20);
+    .limit(20)
+    .orderBy("name", "asc");
   return fandoms;
 };
 

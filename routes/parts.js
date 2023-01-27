@@ -2,14 +2,18 @@ const express = require("express");
 const partsController = require("../controllers/parts");
 const auth = require("./middlewares/auth");
 const { wrap } = require("async-middleware");
+const validate = require("./middlewares/validate");
+const { body } = require("express-validator");
 
 const router = express.Router();
 
 router.post(
   "/",
+  body("text").escape(),
+  validate(),
   auth("USER"),
   wrap(async (req, res) => {
-    const partId = await partsController.createPart({
+    const { partId } = await partsController.createPart({
       workId: req.body.workId,
       authorId: req.user.userId,
       title: req.body.title,
@@ -71,3 +75,17 @@ router.get(
     res.send({ success: true, parts });
   })
 );
+
+router.get(
+  "/work/:workId/all",
+  auth("USER"),
+  wrap(async (req, res) => {
+    const parts = await partsController.getAllPartsByWorkId({
+      workId: req.params.workId,
+      authorId: req.user.userId,
+    });
+    res.send({ success: true, parts });
+  })
+);
+
+module.exports = router;

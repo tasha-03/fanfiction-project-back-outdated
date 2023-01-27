@@ -27,6 +27,19 @@ router.delete(
       recordId: req.params.id,
       userId: req.user.userId,
     });
-    res.send({success: true})
+    res.send({ success: true });
   })
 );
+
+router.get(
+  "",
+  auth("USER"),
+  wrap(async (req, res) => {
+    const works = await historyController.returnHistory({
+      userId: req.user.userId,
+    });
+    res.send({ success: true, works });
+  })
+);
+
+module.exports = router;

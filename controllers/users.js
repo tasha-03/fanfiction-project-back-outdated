@@ -36,7 +36,6 @@ exports.requestEmailConfirmation = async ({ userId }) => {
   const [user] = await knex("users")
     .select("email_is_confirmed as emailIsConfirmed")
     .where({ id: userId });
-  console.log(user);
   if (!user) {
     throw new ControllerException(
       "INTERNAL_SERVER_ERROR",
@@ -112,7 +111,7 @@ exports.login = async ({ login, password }) => {
   if (!user) {
     throw new ControllerException("WRONG_CREDENTIALS", "Wrong credentials");
   }
-  if (!(await checkPass(password, user.hashedPass))) {
+  if (!(await checkPass(password, user.hashedPass || "null"))) {
     throw new ControllerException("WRONG_CREDENTIALS", "Wrong credentials");
   } else {
     return { userId: user.id };
@@ -143,7 +142,6 @@ exports.changeRole = async ({ userId, role }) => {
   if (!user) {
     throw new ControllerException("USER_NOT_FOUND", "User has not been found");
   }
-  console.log(user);
   if (user.login === "fanfiction-project") {
     throw new ControllerException("FORBIDDEN", "Forbidden");
   }
@@ -177,23 +175,33 @@ exports.activateProfile = async ({ userId }) => {
   }
 };
 
-// change preferences (user)
-exports.changePreferences = async ({
+exports.changeProfile = async ({
   userId,
-  dark_theme,
+  login,
+  oldPassword,
+  password,
+  bios,
   emailNotitficationsOn,
 }) => {
-  try {
-    const patch = {};
-    patch.updated_at = knex.fn.now();
-    if (dark_theme !== undefined) patch.dark_theme = dark_theme;
-    if (emailNotitficationsOn)
-      patch.email_notitfications_on = emailNotitficationsOn;
-    await knex("users").where({ id: userId }).update(patch);
-    return {};
-  } catch (error) {
-    throw new ControllerException("USER_NOT_FOUND", "User has not been found");
+  const [user] = await knex("users")
+    .select("id", "password as hashedPass")
+    .where({ id: userId });
+  if (!user) {
+    throw new ControllerException("WRONG_CREDENTIALS", "Wrong credentials");
   }
+  if (oldPassword !== "" && !(await checkPass(oldPassword, user.hashedPass))) {
+    throw new ControllerException("WRONG_CREDENTIALS", "Wrong credentials");
+  }
+  const patch = {};
+  patch.updated_at = knex.fn.now();
+  if (login !== undefined && login !== "") patch.login = login.toLowerCase();
+  if (bios !== undefined && bios !== "") patch.bios = bios;
+  if (password !== undefined && password !== "")
+    patch.password = await hashPass(password);
+  if (emailNotitficationsOn !== undefined && emailNotitficationsOn !== "")
+    patch.email_notitfications_on = emailNotitficationsOn;
+  await knex("users").where({ id: userId }).update(patch);
+  return {};
 };
 
 // request restore password (any)
@@ -278,7 +286,7 @@ exports.restorePassword = async ({
 exports.getUserById = async ({ userId, tz = "UTC" }) => {
   const record = (
     await knex.raw(
-      `select id as userId, login, role, email_is_confirmed as emailIsConfirmed, (created_at::timestamp at time zone 'UTC' at time zone '${tz}') as createdAt from "users" where id = ${userId}`
+      `select id as userId, login, email, bios, role, email_is_confirmed as emailIsConfirmed, (created_at::timestamp at time zone 'UTC' at time zone '${tz}') as createdAt from "users" where id = ${userId}`
     )
   ).rows[0];
   if (!record) {
@@ -287,9 +295,11 @@ exports.getUserById = async ({ userId, tz = "UTC" }) => {
   const user = {};
   user.userId = userId;
   user.login = record.login;
+  user.email = record.email;
   user.role = record.role;
   user.emailIsConfirmed = record.emailisconfirmed;
   user.createdAt = record.createdat;
+  user.bios = record.bios;
   return user;
 };
 
@@ -300,6 +310,27 @@ exports.getUsersByLogin = async ({ login = "", limit = 20, page = 1 }) => {
     .whereRaw(`login similar to '%${login}%'`)
     .orderBy("login", "asc")
     .limit(limit)
-    .offset(limit * (page - 1));
+    .offset(limit * (page - 1))
+    .orderBy([{ column: "login", order: "asc" }]);
   return users;
+};
+
+// get user by id (any)
+exports.getUserByLogin = async ({ login, tz = "UTC" }) => {
+  const record = (
+    await knex.raw(
+      `select id as userId, login, bios, role, email_is_confirmed as emailIsConfirmed, (created_at::timestamp at time zone 'UTC' at time zone '${tz}') as createdAt from "users" where login = '${login}'`
+    )
+  ).rows[0];
+  if (!record) {
+    throw new ControllerException("USER_NOT_FOUND", "User has not been found");
+  }
+  const user = {};
+  user.userId = record.userid;
+  user.login = login;
+  user.role = record.role;
+  user.emailIsConfirmed = record.emailisconfirmed;
+  user.createdAt = record.createdat;
+  user.bios = record.bios;
+  return user;
 };

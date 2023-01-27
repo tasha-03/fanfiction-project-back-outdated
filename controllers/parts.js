@@ -10,41 +10,47 @@ exports.createPart = async ({
   note = null,
   text,
   order,
-  is_visible = false,
+  isVisible = false,
 }) => {
-  const recAuthorId = await knex("works")
-    .select("author_id")
-    .where({ work_id: workId });
+  const recAuthorId = (
+    await knex("works").select("author_id").where({ id: workId })
+  )[0].author_id;
   if (authorId !== recAuthorId) {
     throw new ControllerException("ACCESS_DENIED", "Access denied");
   }
   const [part] = await knex("parts")
-    .select("id")
+    .select("id", "order")
     .where({ work_id: workId, order: order });
   if (part) {
-    throw new ControllerException(
-      "PARTS_ORDER_CONFLICT",
-      "Parts order conflict"
-    );
-  } else {
-    const [{ id: partId }] = await knex("parts")
-      .insert([
-        {
-          work_id: workId,
-          title,
-          description,
-          note,
-          text,
-          order,
-          is_visible,
-        },
-      ])
-      .returning("id");
-    await knex("works")
-      .where({ id: workId })
-      .update({ updated_at: knex.fn.now() });
-    return { partId };
+    const parts = await knex("parts")
+      .select("id as partId", "order")
+      .where({ work_id: workId })
+      .where("order", ">", part.order - 1)
+      .orderBy("order", "desc");
+    for (let i = 0; i < parts.length; i++) {
+      await knex("parts")
+        .where({ id: parts[i].partId })
+        .update({ order: parts[i].order + 1 });
+    }
+    console.log("order changed");
   }
+  const [{ id: partId }] = await knex("parts")
+    .insert([
+      {
+        work_id: workId,
+        title,
+        description,
+        note,
+        text,
+        order,
+        is_visible: isVisible,
+      },
+    ])
+    .returning("id");
+  await knex("works")
+    .where({ id: workId })
+    .update({ updated_at: knex.fn.now() });
+  return { partId };
 };
 
 exports.updatePart = async ({
@@ -107,7 +113,9 @@ exports.deletePart = async ({ partId, authorId }) => {
 
 exports.getPartById = async ({ partId }) => {
   // DONE
-  const [part] = await knex("parts").select("*").where({ id: partId });
+  const [part] = await knex("parts")
+    .select("*")
+    .where({ id: partId, is_visible: true });
   if (!part) {
     throw new ControllerException("PART_NOT_FOUND", "Part has not been found");
   } else {
@@ -121,19 +129,40 @@ exports.getPartsByWorkId = async ({ workId }) => {
   if (!work) {
     throw new ControllerException("WORK_NOT_FOUND", "Work has not been found");
   } else {
-    const parts = await knex("parts").select("*").where({ work_id: workId });
+    const parts = await knex("parts")
+      .select("*")
+      .where({ work_id: workId, is_visible: true });
     return parts;
   }
 };
 
-exports.setPartsOrder = async ({ workId, order }) => {
+exports.getAllPartsByWorkId = async ({ workId, authorId }) => {
+  // DONE
+  const [work] = await knex("works")
+    .select("id", "author_id")
+    .where({ id: workId });
+  if (!work) {
+    throw new ControllerException("WORK_NOT_FOUND", "Work has not been found");
+  } else {
+    if (authorId !== work.author_id) {
+      throw new ControllerException("ACCESS_DENIED", "Access denied");
+    }
+    const parts = await knex("parts")
+      .select("*")
+      .where({ work_id: workId })
+      .orderBy([{ column: "order", order: "asc" }]);
+    return parts;
+  }
+};
+
+exports.setPartsOrder = async ({ workId, order, authorId }) => {
   // DONE
   const recAuthorId = await knex("works")
-  .select("author_id")
-  .where({ work_id: workId });
-if (authorId !== recAuthorId) {
-  throw new ControllerException("ACCESS_DENIED", "Access denied");
-}А
+    .select("author_id")
+    .where({ id: workId });
+  if (authorId !== recAuthorId) {
+    throw new ControllerException("ACCESS_DENIED", "Access denied");
+  }
   const [work] = await knex("works").select("id").where({ id: workId });
   if (!work) {
     throw new ControllerException("WORK_NOT_FOUND", "Work has not been found");

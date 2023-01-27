@@ -1,5 +1,6 @@
 const ControllerException = require("../utils/ControllerException");
 const knex = require("../utils/db");
+const worksController = require("./works");
 
 exports.createTag = async ({ name, category = "other" }) => {
   try {
@@ -11,6 +12,7 @@ exports.createTag = async ({ name, category = "other" }) => {
     ]);
     return {};
   } catch (err) {
+    console.log(err)
     throw new ControllerException(
       "CATEGORY_NOT_FOUND",
       "Category has not been found"
@@ -56,18 +58,29 @@ exports.getTagById = async ({ tagId }) => {
   }
 };
 
-exports.getTagsByName = async ({ name, category = "all" }) => {
+exports.getTagsByName = async ({
+  name,
+  category = "all",
+  limit = 20,
+  page = 1,
+}) => {
   if (["character", "relationship", "other", "all"].includes(category)) {
     if (category === "all") {
       const tags = await knex("tags")
         .select()
-        .where("name", "ilike", `%${name}%`);
+        .where("name", "ilike", `%${name}%`)
+        .limit(limit)
+        .offset(limit * (page - 1))
+        .orderBy([{ column: "name", order: "asc" }]);
       return tags;
     } else {
       const tags = await knex("tags")
         .select()
         .where("name", "ilike", `%${name}%`)
-        .andWhere("category", category);
+        .andWhere("category", category)
+        .limit(limit)
+        .offset(limit * (page - 1))
+        .orderBy([{ column: "name", order: "asc" }]);
       return tags;
     }
   } else {
@@ -81,4 +94,21 @@ exports.getTagsByName = async ({ name, category = "all" }) => {
 exports.getAllTags = async () => {
   const tags = await knex("tags").select();
   return tags;
+};
+
+exports.getWorksByTagId = async ({ tagId, limit, page }) => {
+  const worksIds = await knex("tag_to_work")
+    .select("work_id as workId")
+    .where({ tag_id: tagId })
+    .limit(limit)
+    .offset(limit * (page - 1));
+  const works = [];
+  for (let i = 0; i < worksIds.length; i++) {
+    const work = await worksController.getWorkById({
+      workId: worksIds[i].workId,
+    });
+    if (!work) continue;
+    works.push(work);
+  }
+  return works;
 };
